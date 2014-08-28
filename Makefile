@@ -1,13 +1,13 @@
 TARGET=test
 OBJS=test.o
 
-CFLAGS=-Wall -Werror -g
+CFLAGS=-Wall -g
 LDFLAGS=
 
-$(TARGET):$(OBJS) 
+$(TARGET):$(OBJS) ring.h
 	gcc $^ $(LDFLAGS) -o $@
 
-.c.o: ring.h
+.c.o:
 	gcc $(CFLAGS) $< -c -o $@
 
 clean:

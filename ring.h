@@ -36,7 +36,11 @@ struct ring {
 	int num;	/* item number in ring slot */
 	int tail;	/* tail index in ring slot */
 	int num2;	/* item number in expand slot */
+	int lock;
 };
+
+#define LOCK(r) while (__sync_lock_test_and_set(&(r)->lock,1)) {}
+#define UNLOCK(r) __sync_lock_release(&(r)->lock)
 
 #define is_power_of_2(n) ((((n) - 1) & (n)) == 0)
 
@@ -68,13 +72,15 @@ static inline int ring_need_expand(struct ring *r)
 
 static inline void * ring_push(struct ring *r, void *ptr)
 {
+	LOCK(r);
+
 	if (ring_need_expand(r)) {
 		/* stage2 */
 		int newcap = (r->cap + r->num2) * 2;
 		r->slot = (void**)realloc(r->slot, sizeof(void*)*newcap);
 		r->slot[r->cap + r->num2] = ptr;
 		r->num2++;
-		return ptr;
+		goto out;
 	}
 
 	if (r->num2 == 0) {
@@ -88,6 +94,8 @@ static inline void * ring_push(struct ring *r, void *ptr)
 		r->num2++;
 	}
 
+out:
+	UNLOCK(r);
 	return ptr;
 }
 
@@ -97,6 +105,8 @@ static inline void * ring_pop(struct ring *r)
 
 	if (r->num == 0)
 		return NULL;
+
+	LOCK(r);
 
 	pop = (r->tail - r->num + r->cap) % r->cap;
 	r->num--;
@@ -108,6 +118,8 @@ static inline void * ring_pop(struct ring *r)
 		r->cap = boundup_power_of_two(r->cap + r->num2);
 		r->num2 = 0;
 	}
+
+	UNLOCK(r);
 
 	return r->slot[pop];
 }

@@ -2,7 +2,7 @@ TARGET=test
 OBJS=test.o
 
 CFLAGS=-Wall -g
-LDFLAGS=
+LDFLAGS=-lpthread
 
 $(TARGET):$(OBJS) ring.h
 	gcc $^ $(LDFLAGS) -o $@

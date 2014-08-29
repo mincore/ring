@@ -1,12 +1,51 @@
+#define _POSIX_SOURCE
+#include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <time.h>
+#include <pthread.h>
 #include "ring.h"
 
 #define SIZE 100
 
 int pool[SIZE];
 
+void* push_func(void *p)
+{
+	struct ring *r = (struct ring *)p;
+	unsigned int seed;
+
+	while(1) {
+		ring_push(r, &pool[rand_r(&seed)%SIZE]);
+		usleep(rand_r(&seed)%100000);
+	}
+
+	return NULL;
+}
+
+void* pop_func(void *p)
+{
+	struct ring *r = (struct ring *)p;
+	unsigned int seed;
+	void *ptr;
+
+	while(1) {
+		ptr = ring_pop(r);
+		if (ptr)
+			printf("poped %d\n", *(int*)ptr);
+		else
+			printf("poped NULL\n");
+		usleep(rand_r(&seed)%100000);
+	}
+
+	return NULL;
+}
+
 int main(int argc, char *argv[])
 {
+	pthread_t thr_push;
+	pthread_t thr_pop;
+
 	struct ring ring;
 	int i;
 
@@ -14,23 +53,14 @@ int main(int argc, char *argv[])
 		pool[i] = i;
 	}
 
+	srand(time(NULL));
 	ring_init(&ring, 2);
 
-	for (i = 0; i < SIZE; ++i) {
-		if (!ring_push(&ring, &pool[i]))
-			break;
-	}
+	pthread_create(&thr_push, NULL, push_func, &ring);
+	pthread_create(&thr_pop, NULL, pop_func, &ring);
 
-	for (i = 0; i < SIZE; ++i) {
-		printf("%d %d\n", i, *(int*)ring.slot[i]);
-	}
-
-	while (1) {
-		int *ptr = (int*)ring_pop(&ring);
-		if (!ptr)
-			break;
-		printf("pop %d\n", *ptr);
-	}
+	pthread_join(thr_push, NULL);
+	pthread_join(thr_pop, NULL);
 
 	ring_destroy(&ring);
 
